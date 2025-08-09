@@ -1,0 +1,74 @@
+/* src/ui/styles/base.tcss */
+
+/* Typography & spacing tokens (do NOT set colors here) */
+:root {
+  --font-size: 1.0;
+  --gap-xs: 0.5;
+  --gap-sm: 1;
+  --gap-md: 2;
+  --radius: 1;
+}
+
+/* Color variables (declared here but values come from theme .tcss) */
+:root {
+  --bg:            transparent;
+  --surface:       transparent;
+  --panel:         transparent;
+  --text:          white;
+  --muted:         #888888;
+  --accent:        dodgerblue;
+  --accent-muted:  #1f6fd1;
+  --warning:       #d8a500;
+  --error:         #d14;
+  --success:       #2aa745;
+  --border:        #333333;
+  --focus:         #ffffff;
+}
+
+/* App layout */
+#title {
+  content-align: left middle;
+  padding: 0 var(--gap-sm);
+}
+
+#content {
+  layout: vertical;
+  padding: var(--gap-sm);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.row {
+  layout: horizontal;
+  height: auto;
+  gap: var(--gap-sm);
+}
+
+/* Widgets */
+Button {
+  background: var(--panel);
+  color: var(--text);
+  border: solid gray;
+  border-title-color: var(--text);
+  border-top: tall var(--border);
+  border-right: tall var(--border);
+  border-bottom: tall var(--border);
+  border-left: tall var(--border);
+  padding: 0 1;
+  height: 3;
+}
+
+Button:hover {
+  background: var(--accent-muted);
+}
+
+Button.-primary {
+  background: var(--accent);
+  color: black;
+}
+
+Select {
+  background: var(--panel);
+  color: var(--text);
+  border: tall var(--border);
+}

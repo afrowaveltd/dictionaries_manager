@@ -1,0 +1,19 @@
+{
+    "app": {
+        "schema_version": 1,
+        "locales_path": "locales",
+        "jsons_path": "jsons",
+        "languages_path": "jsons/languages.json",
+        "countries_path": "jsons/countries.json"
+    },
+    "i18n": {
+        "ui_language": "cs",
+        "fallback_language": "en",
+        "default_language": "en"
+    },
+    "backends": {},
+    "translators": {},
+    "middleware": {},
+    "communication": {},
+    "auth": {}
+}

@@ -1,0 +1,24 @@
+/* src/ui/themes/as400.tcss */
+/* Pure variable overrides: green-phosphor look */
+
+:root {
+  --bg:           #001600;
+  --surface:      #001A00;
+  --panel:        #001F00;
+  --text:         #00FF66;
+  --muted:        #00C050;
+  --accent:       #00FF33;  /* bright green for focus/primary */
+  --accent-muted: #00CC33;
+  --warning:      #99FF00;
+  --error:        #FF5555;  /* still readable on green bg */
+  --success:      #00FF66;
+  --border:       #004D00;
+  --focus:        #D7FF00;
+}
+
+/* Optional: make Header/Footers flat-green */
+Header, Footer {
+  background: var(--bg);
+  color: var(--text);
+  text-style: bold;
+}
