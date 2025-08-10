@@ -176,12 +176,8 @@ class Settings:
 
     def __init__(self, data: Dict[str, Any], path: Path):
         self._path = path
-
-        self._root = self._path.parent
-
-        def _abs(self, p: str | os.PathLike[str]) -> Path:
-            q = Path(p)
-            return q if q.is_absolute() else (self._root / q)
+        # Project root (directory where settings.json resides)
+        self._root: Path = self._path.parent
 
         # Buffers for UI diagnostics (soft validation)
         self.warnings: List[str] = []
@@ -205,9 +201,9 @@ class Settings:
         self.theme: str = app_cfg.get("theme", "as400")
         self.themes_path: str = app_cfg.get("themes_path", "src/ui/themes")
 
-        # Load catalogs (non-fatal if missing)
-        self.languages = LanguageCatalog(Path(self.languages_path))
-        self.countries = CountryCatalog(Path(self.countries_path))
+        # Load catalogs (non-fatal if missing) via absolute paths
+        self.languages = LanguageCatalog(self._abs(self.languages_path))
+        self.countries = CountryCatalog(self._abs(self.countries_path))
 
         # --- i18n ---
         i18n_cfg = data.get("i18n", {}) or {}
@@ -251,6 +247,13 @@ class Settings:
 
         # Collect soft warnings (do not raise; UI will guide user to fix)
         self._soft_validate()
+
+    # ---- Path helpers ----------------------------------------------------------
+
+    def _abs(self, p: str | os.PathLike[str]) -> Path:
+        """Return an absolute path, resolved against the folder with settings.json."""
+        q = Path(p)
+        return q if q.is_absolute() else (self._root / q)
 
     # ---- Loading ---------------------------------------------------------------
 
@@ -367,7 +370,7 @@ class Settings:
 
     def _scan_themes(self) -> List[ThemeInfo]:
         """Scan themes_path for *.tcss and *.custom.tcss and classify them + read meta."""
-        base = Path(self.themes_path)
+        base = self._abs(self.themes_path)
         results: List[ThemeInfo] = []
         if not base.exists():
             return results
@@ -423,33 +426,32 @@ class Settings:
 
     def resolve_theme_files(self, name: Optional[str] = None) -> List[str]:
         """
-        Resolve CSS load order:
-        1) styles/base.tcss
-        2) {name}.custom.tcss or {name}.tcss
+        Resolve CSS load order (absolute paths):
+        1) src/ui/styles/base.tcss
+        2) themes/{name}.custom.tcss or {name}.tcss
         Fallback to 'as400' if selected name not found. Last resort: only base.
         """
         name = (name or self.theme or "as400").lower()
-        base_css = "src/ui/styles/base.tcss"
 
-        # try custom first
-        candidate_custom = Path(self.themes_path) / f"{name}.custom.tcss"
-        candidate_system = Path(self.themes_path) / f"{name}.tcss"
+        base_css = self._abs("src/ui/styles/base.tcss")
+        themes_dir = self._abs(self.themes_path)
 
-        if candidate_custom.exists():
-            return [base_css, str(candidate_custom)]
-        if candidate_system.exists():
-            return [base_css, str(candidate_system)]
+        cand_custom = themes_dir / f"{name}.custom.tcss"
+        cand_system = themes_dir / f"{name}.tcss"
 
-        # fallback to as400
-        fallback_custom = Path(self.themes_path) / "as400.custom.tcss"
-        fallback_system = Path(self.themes_path) / "as400.tcss"
-        if fallback_custom.exists():
-            return [base_css, str(fallback_custom)]
-        if fallback_system.exists():
-            return [base_css, str(fallback_system)]
+        if cand_custom.exists():
+            return [str(base_css), str(cand_custom)]
+        if cand_system.exists():
+            return [str(base_css), str(cand_system)]
 
-        # last resort: only base
-        return [base_css]
+        fb_custom = themes_dir / "as400.custom.tcss"
+        fb_system = themes_dir / "as400.tcss"
+        if fb_custom.exists():
+            return [str(base_css), str(fb_custom)]
+        if fb_system.exists():
+            return [str(base_css), str(fb_system)]
+
+        return [str(base_css)]
 
     # ---- Validation & normalization -------------------------------------------
 
@@ -488,7 +490,7 @@ class Settings:
     def _soft_validate(self) -> None:
         """Collect fixable issues as warnings. Only unrecoverable problems should go to errors."""
         # Ensure jsons directory exists lazily (we warn but don't fail)
-        jsons_dir = Path(self.jsons_path)
+        jsons_dir = self._abs(self.jsons_path)
         if not jsons_dir.exists():
             self.warnings.append(
                 f"Helper JSONs folder '{self.jsons_path}' does not exist yet. "
@@ -496,7 +498,7 @@ class Settings:
             )
 
         # locales dir existence (warning, we can create later)
-        if not Path(self.locales_path).exists():
+        if not self._abs(self.locales_path).exists():
             self.warnings.append(
                 f"Locales path '{self.locales_path}' does not exist yet. "
                 f"It will be created on demand."
@@ -589,7 +591,7 @@ class Settings:
         Return a Path to a helper JSON file under the jsons/ folder.
         This is the canonical place for static JSON catalogs used by the app.
         """
-        return Path(self.jsons_path) / filename
+        return self._abs(Path(self.jsons_path) / filename)
 
     # ---- UI guidance -----------------------------------------------------------
 

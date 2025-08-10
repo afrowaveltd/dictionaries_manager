@@ -7,9 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple, Set
 
-from marshmallow import missing
-
-import src
 from src.config.settings import Settings
 
 _LANG_FILE_RE = re.compile(r"^([a-z]{2})\.json$", re.IGNORECASE)
@@ -31,7 +28,7 @@ class LocalizationService:
     - default_language file maps key -> key
     - target languages map key -> translated value (or missing/empty)
 
-    Fallback order: primary language -> default_language -> key
+    Fallback order: primary language -> default_language -> key.
     Cache: language dicts are cached; cache is invalidated if the source file mtime changes.
     """
 
@@ -39,11 +36,12 @@ class LocalizationService:
         self.settings = settings
         self._cache: Dict[str, Dict[str, str]] = {}    # lang -> dict(key->value)
         self._mtimes: Dict[str, float] = {}            # lang -> last known file mtime
+        self._runtime_cache: Dict[Tuple[str, str, str], str] = {}  # (text, src, dest) -> translated
 
     # --- Files & I/O -----------------------------------------------------------
 
     def _lang_file(self, lang: str) -> Path:
-        base = Path(self.settings.locales_path)
+        base = self.settings._abs(self.settings.locales_path)
         return base / f"{lang.lower()}.json"
 
     def _file_mtime(self, lang: str) -> float:
@@ -71,9 +69,9 @@ class LocalizationService:
         data: Dict[str, str] = {}
         if fp.exists():
             try:
-                data = json.loads(fp.read_text(encoding="utf-8"))
-                if not isinstance(data, dict):
-                    data = {}
+                raw = fp.read_text(encoding="utf-8")
+                parsed = json.loads(raw)
+                data = parsed if isinstance(parsed, dict) else {}
             except Exception:
                 data = {}
 
@@ -130,6 +128,21 @@ class LocalizationService:
             self._write_lang(lang, tgt)
         return changed
 
+    def compute_diff_with_default(self, lang: str) -> Tuple[Set[str], Set[str]]:
+        """
+        Return (missing_keys, extra_keys) for `lang` vs. default_language, without writing anything.
+        """
+        lang = lang.lower()
+        src = self._load_lang(self.settings.default_language)
+        tgt = self._load_lang(lang)
+
+        src_keys = set(src.keys())
+        tgt_keys = set(tgt.keys())
+
+        missing = src_keys - tgt_keys    # in default, missing in target
+        extra = tgt_keys - src_keys      # in target, not in default
+        return missing, extra
+
     # --- Language discovery & cache control ------------------------------------
 
     def available_languages(self) -> List[LanguageInfo]:
@@ -137,7 +150,7 @@ class LocalizationService:
         Discover available languages by listing files in locales/ and
         picking only two-letter codes with '.json' extension.
         """
-        base = Path(self.settings.locales_path)
+        base = self.settings._abs(self.settings.locales_path)
         langs: List[LanguageInfo] = []
         if not base.exists():
             return langs
@@ -172,6 +185,34 @@ class LocalizationService:
             self._cache.clear()
             self._mtimes.clear()
 
+    # --- Live translate (for theme descriptions, etc.) --------------------------
+
+    def translate_runtime(self, text: str, src_lang: str, dest_lang: str, translator=None) -> str:
+        """
+        Live translate (no persistence). First return original if lang same,
+        then optional translator; cached in memory.
+        """
+        src = (src_lang or self.settings.default_language).lower()
+        dest = (dest_lang or self.settings.ui_language).lower()
+        if src == dest:
+            return text
+
+        key = (text, src, dest)
+        if key in self._runtime_cache:
+            return self._runtime_cache[key]
+
+        if translator is not None:
+            try:
+                translated = translator.translate(text=text, src=src, dest=dest)  # adapter later
+                if isinstance(translated, str) and translated.strip():
+                    self._runtime_cache[key] = translated
+                    return translated
+            except Exception:
+                pass
+
+        self._runtime_cache[key] = text
+        return text
+
     # --- Public API -------------------------------------------------------------
 
     def set_language(self, lang: str) -> None:
@@ -199,19 +240,3 @@ class LocalizationService:
 
     def is_rtl(self, lang: Optional[str] = None) -> bool:
         return self.settings.is_rtl(lang)
-    
-    def compute_diff_with_default(self, lang: str) -> Tuple[Set[str], Set[str]]:
-        """
-        Return (missing_keys, extra_keys) for `lang` vs. default_language,
-        without writing anything.
-        """
-        lang = lang.lower()
-        src = self._load_lang(self.settings.default_language)
-        tgt = self._load_lang(lang)
-
-        src_keys = set(src.keys())
-        tgt_keys = set(tgt.keys())
-
-        missing = src_keys - tgt_keys    # keys present in default, missing in target
-        extra = tgt_keys - src_keys      # keys present in target, not in default
-        return missing, extra
